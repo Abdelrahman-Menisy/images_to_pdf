@@ -1,14 +1,20 @@
+from fastapi import FastAPI, UploadFile, File
 from fpdf import FPDF
 from PIL import Image
+from io import BytesIO
+from starlette.responses import Response
 
-def convert_images_to_pdf(image_paths, output_pdf_path):
+app = FastAPI()
+
+@app.post("/convert_images_to_pdf")
+async def convert_images_to_pdf(images: list[UploadFile] = File(...)):
     pdf = FPDF()
-    for image_path in image_paths:
-        image = Image.open(image_path)
+    for image in images:
+        image_data = await image.read()
+        image_pil = Image.open(BytesIO(image_data))
         pdf.add_page()
-        pdf.image(image_path, x = 0, y = 0, w = 210, h = 297)  # Adjust dimensions as needed
-    pdf.output(output_pdf_path)
-
-# Example usage
-image_paths = ["f12b6bc4e99d57f11d3d281dcf11ea13.jpg", "be65b446-4d20-4786-ac01-e2c512d293b9.jpeg",'d2b5f2fb-52d5-4fba-92e1-703e5cf1ae51.png']
-convert_images_to_pdf(image_paths, "output.pdf")
+        pdf.image(BytesIO(image_data), x=0, y=0, w=210, h=297)  # Adjust dimensions as needed
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+    return Response(pdf_buffer.read(), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=converted_images.pdf"})
